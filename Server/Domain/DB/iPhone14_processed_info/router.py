@@ -24,7 +24,7 @@ router = APIRouter(
 @router.get("/", status_code=status.HTTP_200_OK)
 def read_records_by_option(model: str|None = None, storage: str|None = None,
                                   battery: int = -1, status: int|None = None,  
-                                  feat_list: str = "0,0,0,0,0,0,0", db: Session=Depends(get_db)):
+                                  feat_list: str = "0000000", db: Session=Depends(get_db)):
     return query.select_records_by_option(model=model,storage=storage,battery=battery,status=status,feat_list=feat_list,db=db)
     
 @router.get("/{id}", status_code=status.HTTP_200_OK)
@@ -33,4 +33,4 @@ def read_record_by_id(id: int, db: Session=Depends(get_db)):
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
 def insert_record(IPI: IPhone14ProcessedInfo, db: Session=Depends(get_db)):
-    query.insert_record(db=db, IPI=IPI)
+    return query.insert_record(db=db, IPI=IPI)

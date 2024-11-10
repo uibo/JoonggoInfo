@@ -14,7 +14,7 @@ router = APIRouter(
 @router.get("/", status_code=status.HTTP_200_OK)
 def cal_mvl_data(model: str|None = None, storage: str|None = None,
                     battery: int = -1, status: int|None = None,  
-                    feat_list: str = "0,0,0,0,0,0,0", db: Session=Depends(get_db)):
+                    feat_list: str = "0000000", db: Session=Depends(get_db)):
     records = query.select_records_by_option(db=db,model=model,storage=storage,battery=battery,status=status,feat_list=feat_list)
     data = []
     for record in records:
