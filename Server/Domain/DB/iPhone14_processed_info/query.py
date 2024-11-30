@@ -1,11 +1,13 @@
+from datetime import datetime
+
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from models import iPhone14_processed_info
 
-def select_records_by_option(db: Session, model: str|None = None, storage: str|None = None,
-                                  battery: int = -1, status: int|None = None,  
-                                  feat_list: str = "0000000"):
+def select_records_by_option(db: Session, model: str, storage: str,
+                                  battery: int, status: int,  
+                                  feat_list: str, search_date: str):
     query = db.query(iPhone14_processed_info)
     if model != None:
         query = query.filter(iPhone14_processed_info.model == model)
@@ -15,6 +17,8 @@ def select_records_by_option(db: Session, model: str|None = None, storage: str|N
         query = query.filter(iPhone14_processed_info.battery >= battery)
     if status != None:
         query = query.filter(iPhone14_processed_info.status == status)
+    query = query.filter(iPhone14_processed_info.upload_date>=datetime.strptime(search_date[:10],'%Y-%m-%d'))
+    query = query.filter(iPhone14_processed_info.upload_date<=datetime.strptime(search_date[10:], '%Y-%m-%d'))
     feat_dict = {"기스": int(feat_list[0]),
                  "흠집": int(feat_list[1]),
                  "찍힘": int(feat_list[2]),
