@@ -14,8 +14,14 @@ router = APIRouter(
 @router.get("/", status_code=status.HTTP_200_OK)
 def cal_mvl_data(model: str|None = None, storage: str|None = None,
                     battery: int = -1, status: int|None = None,  
-                    feat_list: str = "0000000", db: Session=Depends(get_db)):
-    records = query.select_records_by_option(db=db,model=model,storage=storage,battery=battery,status=status,feat_list=feat_list)
+                    feat_list: str = "0000000", search_date: str = '2022-01-012024-11-30', db: Session=Depends(get_db)):
+    records = query.select_records_by_option(model=model,
+                                             storage=storage,
+                                             battery=battery,
+                                             status=status,
+                                             feat_list=feat_list,
+                                             search_date=search_date,
+                                             db=db)
     data = []
     for record in records:
         data.append({"upload_date": record.upload_date,
