@@ -1,8 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
+
 void main() {
-  runApp(MyApp());
+  runApp(
+    ProviderScope(
+      child: MyApp()
+    )
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -139,20 +146,163 @@ class MainPageState extends State<MainPage> {
   }
 }
 
-class ChartPage extends StatefulWidget {
+
+enum SaleStatus { selling, soldout }
+final settingsProvider = StateNotifierProvider<SettingsNotifier, Settings>((ref) => SettingsNotifier());
+class SettingsNotifier extends StateNotifier<Settings> {
+  SettingsNotifier() : super(Settings(
+    toDate: DateFormat("yyyy-MM-dd").format(DateTime.now())));
+
+  void updateproduct (String newValue) {
+    state = Settings(
+      product: newValue, 
+      model: state.model, 
+      storage: state.storage,
+      fromDate: state.fromDate,
+      toDate: state.toDate,
+      battery: state.battery,
+      saleStatus: state.saleStatus,
+      options: state.options,
+    );
+  }
+  void updatemodel (String newValue) {
+    state = Settings(
+      product: state.product, 
+      model: newValue, 
+      storage: state.storage,
+      fromDate: state.fromDate,
+      toDate: state.toDate,
+      battery: state.battery,
+      saleStatus: state.saleStatus,
+      options: state.options,
+    );
+  }
+  void updatestorage (String newValue) {
+    state = Settings(
+      product: state.product, 
+      model: state.model, 
+      storage: newValue,
+      fromDate: state.fromDate,
+      toDate: state.toDate,
+      battery: state.battery,
+      saleStatus: state.saleStatus,
+      options: state.options,
+    );
+  }
+  void updatefromDate (String newValue) {
+    state = Settings(
+      product: state.product, 
+      model: state.model, 
+      storage: state.storage,
+      fromDate: newValue,
+      toDate: state.toDate,
+      battery: state.battery,
+      saleStatus: state.saleStatus,
+      options: state.options,
+    );
+  }
+  void updatetoDate (String newValue) {
+    state = Settings(
+      product: state.product, 
+      model: state.model, 
+      storage: state.storage,
+      fromDate: state.fromDate,
+      toDate: newValue,
+      battery: state.battery,
+      saleStatus: state.saleStatus,
+      options: state.options,
+    );
+  }
+  void updatebattery (String newValue) {
+    state = Settings(
+      product: state.product, 
+      model: state.model, 
+      storage: state.storage,
+      fromDate: state.fromDate,
+      toDate: state.toDate,
+      battery: newValue,
+      saleStatus: state.saleStatus,
+      options: state.options,
+    );
+  }
+  void updatesaleStatus (Set<SaleStatus> newValue) {
+    state = Settings(
+      product: state.product, 
+      model: state.model, 
+      storage: state.storage,
+      fromDate: state.fromDate,
+      toDate: state.toDate,
+      battery: state.battery,
+      saleStatus: newValue,
+      options: state.options,
+    );
+  }
+  void updateoption(String key) {
+    Map<String, bool> newoptions = Map<String, bool>.from(state.options);
+
+    newoptions[key] = !(newoptions[key] ?? false);
+    
+    state = Settings(
+      product: state.product, 
+      model: state.model, 
+      storage: state.storage,
+      fromDate: state.fromDate,
+      toDate: state.toDate,
+      battery: state.battery,
+      saleStatus: state.saleStatus,
+      options: newoptions,
+    );
+  }
+}
+class Settings {
+  final String product;
+  final String model;
+  final String storage;
+  final String fromDate;
+  final String toDate;
+  final String battery;
+  final Set<SaleStatus> saleStatus; 
+  Map<String, bool> options;
+
+  Settings({
+    this.product='iPhone14',
+    this.model='Normal',
+    this.storage='128GB',
+    this.fromDate='2022-01-01',
+    this.toDate='2024-06-31',
+    this.battery='0',
+    this.saleStatus=const <SaleStatus>{SaleStatus.selling},
+    this.options = const {'기스':false, '흠집':false, '파손':false, '찍힘':false, '잔상':false, '미개봉':false, '애플케어플러스':false}
+  });
+}
+
+class ChartPage extends ConsumerStatefulWidget {
   const ChartPage ({super.key});
 
   @override
   ChartPageState createState() => ChartPageState();
 }
-class ChartPageState extends State<ChartPage> {
+class ChartPageState extends ConsumerState<ChartPage> {
   @override
   Widget build(BuildContext context) {
+    final selectedSettings = ref.watch(settingsProvider);
+
     return Column(
       children: [
-        SettingBar(),
-        Expanded( // 남은 공간 채우기
-          child: Text("chart\nchart\nchart\nchart\nchart\nchart\nchart\nchart\nchart\n"), // 그래프 위젯
+        const SettingBar(),
+        Expanded(
+          child: Column(
+            children: [
+              Text(selectedSettings.product),
+              Text(selectedSettings.model),
+              Text(selectedSettings.storage),
+              Text(selectedSettings.fromDate),
+              Text(selectedSettings.toDate),
+              Text(selectedSettings.battery),
+              Text(selectedSettings.saleStatus.toString()),
+              Text(selectedSettings.options.toString()),
+            ],
+          ) 
         ),
       ],
     );
@@ -177,26 +327,36 @@ class EnrollPage extends StatelessWidget {
   }
 }
 
-class DropdownButtonTemplate extends StatefulWidget {
-  const DropdownButtonTemplate (this.list);
-  final List<String>? list;
+class DropdownButtonTemplate extends ConsumerStatefulWidget {
+  const DropdownButtonTemplate ({required this.list, required this.valueName, super.key});
+  final List<String> list;
+  final String valueName;
 
   @override
   DropdownButtonTemplateState createState() => DropdownButtonTemplateState();
 }
-class DropdownButtonTemplateState extends State<DropdownButtonTemplate> {
-  late List<String>? _list;
-  late String _selectedValue;
+class DropdownButtonTemplateState extends ConsumerState<DropdownButtonTemplate> {
+  late List<String> _list;
+  late String _valueName;
 
   @override
   void initState() {
     super.initState();
     _list = widget.list;
-    _selectedValue = _list![0];
+    _valueName = widget.valueName;
   }
 
   @override
   Widget build(BuildContext context) {
+    final String selectedValue = ref.watch(settingsProvider.select((settings) {
+      switch (_valueName) {
+        case 'product': return settings.product;
+        case 'model':return settings.model;
+        case 'storage': return settings.storage;
+        default: return '';
+      }
+    }));
+
     return Container(
       height: 50,
       decoration: ShapeDecoration(
@@ -209,24 +369,24 @@ class DropdownButtonTemplateState extends State<DropdownButtonTemplate> {
       child: DropdownButton(
         underline: Container(),
         focusColor: Colors.white, // 포커스 시 색상
-        value: _selectedValue,
-        items: _list?.map<DropdownMenuItem<String>>((String value) {
+        value: selectedValue,
+        items: _list.map<DropdownMenuItem<String>>((String value) {
           return DropdownMenuItem<String>(
             value: value,
             child: Text(value.padRight(20)),
           );
         }).toList(),
         onChanged: (String? newValue) {
-          setState(() {
-            _selectedValue = newValue!;
-          });
+          switch (_valueName) {
+            case 'product': ref.read(settingsProvider.notifier).updateproduct(newValue!);
+            case 'model': ref.read(settingsProvider.notifier).updatemodel(newValue!);
+            case 'storage': ref.read(settingsProvider.notifier).updatestorage(newValue!);
+          }
         },
       ),
     );
   }
 }
-
-
 
 class SettingBar extends StatelessWidget {
   const SettingBar ({super.key});
@@ -235,8 +395,40 @@ class SettingBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        SettingBar1(),
-        SettingBar2(),
+        Row(
+          children: [
+            const Expanded(
+              child: SettingBar1(),
+            ),
+            Container(
+              margin: const EdgeInsets.only(right: 50),
+              padding: const EdgeInsets.only(top:20, bottom: 20),
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  elevation: 2,
+                  shadowColor: Colors.lightBlue,
+                  enableFeedback: true,
+                  overlayColor: Colors.lightBlue,
+                  minimumSize: const Size(30, 40),
+                  backgroundColor: const Color.fromARGB(255, 45, 45, 45),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)
+                  )
+                ),
+                onPressed: () {}, 
+                child: const Text(
+                  '검색',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontFamily: 'Open Sans',
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SettingBar2(),
       ],
     );
   }
@@ -247,84 +439,73 @@ class SettingBar1 extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    return const Row(
       mainAxisAlignment: MainAxisAlignment.spaceAround,
       children: [
-        DropdownButtonTemplate(['iPhone14', 'iPhone15']),
-        DropdownButtonTemplate(['Normal', 'Plus']),
-        DropdownButtonTemplate(['128GB', '256GB']),
-        DatePicker(),
-        DatePicker(),
-        Container(
-          padding: EdgeInsets.only(top:20, bottom: 20),
-          child: ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              overlayColor: Colors.yellowAccent,
-              minimumSize: Size(30, 40),
-              backgroundColor: const Color.fromARGB(255, 45, 45, 45),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12)
-              )
-            ),
-            onPressed: () {}, 
-            child: Text(
-              '검색',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontFamily: 'Open Sans',
-              ),
-            ),
-          ),
-        )
+        DropdownButtonTemplate(list: ['iPhone14', 'iPhone15'], valueName: 'product',),
+        DropdownButtonTemplate(list: ['Normal', 'Plus'], valueName: 'model',),
+        DropdownButtonTemplate(list: ['128GB', '256GB'], valueName: 'storage',),
+        DatePicker(to: false),
+        DatePicker(to: true),
       ]
     );
   }
 }
 
-class DatePicker extends StatefulWidget {
-  const DatePicker ({super.key});
+class DatePicker extends ConsumerStatefulWidget {
+  const DatePicker ({required this.to, super.key});
+  final bool to;
 
   @override
   DatePickerState createState() => DatePickerState();
 }
-class DatePickerState extends State<DatePicker> {
-  DateTime selectedDate = DateTime.now();
+class DatePickerState extends ConsumerState<DatePicker> {
+  late bool _to;
+  
+  @override
+  void initState() {
+    super.initState();
+    _to = widget.to;
+  }
 
-  Future<void> _selectDate(BuildContext context) async {
+  Future<void> _selectDate(BuildContext context, String selectedDate) async {
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: selectedDate,
-      firstDate: DateTime(2000),
+      initialDate: DateTime.parse(selectedDate),
+      firstDate: DateTime(2020),
       lastDate: DateTime(2025),
     );
-    
-    if (picked != null && picked != selectedDate) {
-      setState(() {
-        selectedDate = picked;
-      });
+    if (picked != null) {
+      if (_to) {ref.read(settingsProvider.notifier).updatetoDate(DateFormat('yyyy-MM-dd').format(picked));}
+      else {ref.read(settingsProvider.notifier).updatefromDate(DateFormat('yyyy-MM-dd').format(picked));}
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final String selectedDate = 
+      _to == true ? 
+      ref.watch(settingsProvider.select((settings) => settings.toDate)) :
+      ref.watch(settingsProvider.select((settings) => settings.fromDate));
+
     return Container(
       height: 50,
       decoration: ShapeDecoration(
         color: Colors.white,
         shape: RoundedRectangleBorder(
-          side: BorderSide(width: 2, color: Color(0xFFB1B9C0)),
+          side: const BorderSide(width: 2, color: Color(0xFFB1B9C0)),
           borderRadius: BorderRadius.circular(4),
         ),
       ),
       child: TextButton(
-        onPressed: () => _selectDate(context),
+        onPressed: () => _selectDate(context, selectedDate),
         child: Row(
             children: [
-              Text("${selectedDate.toString().split(' ')[0]}",
-                style: TextStyle(fontSize: 16)
+              Text(
+                selectedDate,
+                style: const TextStyle(fontSize: 16)
               ),
-              FlutterLogo()
+              const Icon(Icons.calendar_month_sharp)
             ]
           ),
       )
@@ -332,26 +513,25 @@ class DatePickerState extends State<DatePicker> {
   }
 }
 
-
 class SettingBar2 extends StatelessWidget {
   const SettingBar2({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    return const Row(
       mainAxisAlignment: MainAxisAlignment.spaceAround,
       children: [
         BatteryWidget(),
         SaleStatusButton2(),
         Row(
           children: [
-            OptionButton('기스'),
-            OptionButton('흠집'),
-            OptionButton('찍힘'),
-            OptionButton('파손'),
-            OptionButton('잔상'),
-            OptionButton('미개봉'),
-            OptionButton('애플케어플러스', containerWidth: 150,),
+            OptionButton(optionName: '기스', containerWidth: 80,),
+            OptionButton(optionName: '흠집', containerWidth: 80,),
+            OptionButton(optionName: '파손', containerWidth: 80,),
+            OptionButton(optionName: '찍힘', containerWidth: 80,),
+            OptionButton(optionName: '잔상', containerWidth: 80,),
+            OptionButton(optionName: '미개봉', containerWidth: 80,),
+            OptionButton(optionName: '애플케어플러스', containerWidth: 150,),
           ],
         ),
       ],
@@ -363,20 +543,13 @@ class BatteryWidget extends StatefulWidget {
   const BatteryWidget({super.key});
 
   @override
-  State<BatteryWidget> createState() => _BatteryWidgetState();
+  BatteryWidgetState createState() => BatteryWidgetState();
 }
-class _BatteryWidgetState extends State<BatteryWidget> {
-  int batteryValue = 0;
-  
-  @override
-  void initState() {
-    super.initState();
-  }
-
+class BatteryWidgetState extends State<BatteryWidget> {
   @override
   Widget build(BuildContext context) {
     return 
-    Row(
+    const Row(
       children: [
         Text(
           "Battery",
@@ -393,35 +566,41 @@ class _BatteryWidgetState extends State<BatteryWidget> {
   }
 }
 
-class NumberInput extends StatefulWidget {
+class NumberInput extends ConsumerStatefulWidget {
   const NumberInput({super.key});
 
   @override
-  State<NumberInput> createState() => _NumberInputState();
+  NumberInputState createState() => NumberInputState();
 }
-class _NumberInputState extends State<NumberInput> {
+class NumberInputState extends ConsumerState<NumberInput> {
   late TextEditingController _controller;
-  var _value = 0;
   final min = 0;
   final max = 100;
 
   @override
   void initState() {
     super.initState();
-    _controller = TextEditingController(text: _value.toString());
+    _controller = TextEditingController();
   }
 
-  void _updateValue(int newValue) {
-    if (newValue >= min && newValue <= max) {
-      setState(() {
-        _value = newValue;
-        _controller.text = _value.toString();
-      });
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void updateValue(int newValue) {
+    if (min <= newValue && newValue <= max) {
+      ref.read(settingsProvider.notifier).updatebattery(newValue.toString());
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final batteryValue = ref.watch(settingsProvider.select((settings) => int.parse(settings.battery)));
+    
+    if (_controller.text != batteryValue.toString()) _controller.text = batteryValue.toString();
+
     return Container(
       width: 150,
       child: Row(
@@ -429,14 +608,14 @@ class _NumberInputState extends State<NumberInput> {
           Container(
             decoration: ShapeDecoration(
               shape: RoundedRectangleBorder(
-                side: BorderSide(width: 2, color: Color(0xFF7E878F)),
+                side: const BorderSide(width: 2, color: Color(0xFF7E878F)),
                 borderRadius: BorderRadius.circular(4),
               ),
             ),
             child: IconButton(
               padding: EdgeInsets.zero,
-              onPressed: () => _updateValue(_value - 1),
-              icon: Icon(Icons.remove),
+              onPressed: () => updateValue(batteryValue - 1),
+              icon: const Icon(Icons.remove),
             ),
           ),
           Expanded(
@@ -445,9 +624,9 @@ class _NumberInputState extends State<NumberInput> {
               textAlign: TextAlign.center,
               keyboardType: TextInputType.number,
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              onChanged: (value) {
-                if (value.isNotEmpty) {
-                  _updateValue(int.parse(value));
+              onChanged: (newvalue) {
+                if (newvalue.isNotEmpty) {
+                  updateValue(int.parse(newvalue));
                 }
               },
               enableInteractiveSelection: false,
@@ -456,14 +635,14 @@ class _NumberInputState extends State<NumberInput> {
           Container(
             decoration: ShapeDecoration(
               shape: RoundedRectangleBorder(
-                side: BorderSide(width: 2, color: Color(0xFF7E878F)),
+                side: const BorderSide(width: 2, color: Color(0xFF7E878F)),
                 borderRadius: BorderRadius.circular(4),
               ),
             ),
             child: IconButton(
               padding: EdgeInsets.zero,
-              onPressed: () => _updateValue(_value + 1),
-              icon: Icon(Icons.add),
+              onPressed: () => updateValue(batteryValue + 1),
+              icon: const Icon(Icons.add),
             ),
           ),
         ],
@@ -472,27 +651,20 @@ class _NumberInputState extends State<NumberInput> {
   }
 }
 
-enum SaleStatus { sale, sold }
-class SaleStatusButton2 extends StatefulWidget {
+class SaleStatusButton2 extends ConsumerStatefulWidget {
   const SaleStatusButton2 ({super.key});
   
   @override
-  State<SaleStatusButton2> createState() => _SaleStatusButtonState2();
+  SaleStatusButtonState2 createState() => SaleStatusButtonState2();
 }
-class _SaleStatusButtonState2 extends State<SaleStatusButton2> {
-  
-  Set<SaleStatus> saleStatus = {SaleStatus.sale};
-  
-  @override
-  void initState() {
-    super.initState();
-  }
-
+class SaleStatusButtonState2 extends ConsumerState<SaleStatusButton2> {
   @override
   Widget build(BuildContext context) {
+    Set<SaleStatus> saleStatus = ref.watch(settingsProvider.select((settings) => settings.saleStatus));
+
     return SegmentedButton<SaleStatus>(
       style: ButtonStyle(
-        side: WidgetStatePropertyAll(BorderSide(width: 2)),
+        side: const WidgetStatePropertyAll(BorderSide(width: 2)),
         shape: WidgetStatePropertyAll<OutlinedBorder>(
           RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(4),
@@ -501,7 +673,7 @@ class _SaleStatusButtonState2 extends State<SaleStatusButton2> {
       ),
       segments: const <ButtonSegment<SaleStatus>>[
         ButtonSegment<SaleStatus>(
-          value: SaleStatus.sale,
+          value: SaleStatus.selling,
           label: SizedBox(
             width: 70, 
             child: Text("판매중"),
@@ -511,7 +683,7 @@ class _SaleStatusButtonState2 extends State<SaleStatusButton2> {
           ),
         ),
         ButtonSegment<SaleStatus>(
-          value: SaleStatus.sold,
+          value: SaleStatus.soldout,
           label: SizedBox(
             width: 70, 
             child: Text("판매완료"),
@@ -523,9 +695,7 @@ class _SaleStatusButtonState2 extends State<SaleStatusButton2> {
       ],
       selected: saleStatus,
       onSelectionChanged: (Set<SaleStatus> newSelection) {
-        setState(() {
-          saleStatus = newSelection;
-        });
+        ref.read(settingsProvider.notifier).updatesaleStatus(newSelection);
       },
       multiSelectionEnabled: true,
       emptySelectionAllowed: true,
@@ -611,50 +781,43 @@ class _SaleStatusButton1State extends State<SaleStatusButton1> {
   }
 }
 
-class OptionButton extends StatefulWidget {
-  const OptionButton (this.optionName, {super.key, this.containerWidth = 80});
+class OptionButton extends ConsumerStatefulWidget {
+  const OptionButton ({required this.optionName, required this.containerWidth, super.key});
   final String optionName;
   final int containerWidth;
 
   @override
   OptionButtonState createState() => OptionButtonState();
 }
-class OptionButtonState extends State<OptionButton> {
-  bool _selectedState = false;
-
-  void changeState() {
-    setState(() {
-      _selectedState = !_selectedState;
-    });
-  }
-
+class OptionButtonState extends ConsumerState<OptionButton> {
   @override
   Widget build(BuildContext context) {
-    return Container(
-        decoration: ShapeDecoration(
-          color: _selectedState == false ? Colors.white : Color(0xFF495057),
-          shape: RoundedRectangleBorder(
-            side: BorderSide(
-              width: 2, 
-              color: Color(0xFF495057)
-            ),
-            borderRadius: BorderRadius.circular(6),
-          ),
+    bool selectedState = ref.watch(settingsProvider.select((settings) => settings.options[widget.optionName]!));
+
+    return OutlinedButton(
+      onPressed: () {
+        ref.read(settingsProvider.notifier).updateoption(widget.optionName);
+      },
+      style: OutlinedButton.styleFrom(
+        foregroundColor: selectedState ? Colors.white : const Color(0xFF495057),
+        backgroundColor: selectedState ? const Color(0xFF495057) : Colors.white,
+        side: const BorderSide(
+          width: 2,
+          color: Color(0xFF495057),
         ),
-        child: Center(
-          child: TextButton(
-            onPressed: changeState,
-            child: Text(
-              widget.optionName,
-              style: TextStyle(
-                color:_selectedState == false? Color(0xFF495057) : Colors.white,
-                fontSize: 16,
-                fontFamily: 'Open Sans',
-              ),
-            ),
-          )
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(6),
         ),
-      );
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      ),
+      child: Text(
+        widget.optionName,
+        style: const TextStyle(
+          fontSize: 16,
+          fontFamily: 'Open Sans',
+        ),
+      ),
+    );
   }
 }
 
