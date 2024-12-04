@@ -1,8 +1,13 @@
+import 'dart:convert';
+
+import 'package:http/http.dart' as http;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+
 
 void main() {
   runApp(
@@ -270,11 +275,60 @@ class Settings {
     this.storage='128GB',
     this.fromDate='2022-01-01',
     this.toDate='2024-06-31',
-    this.battery='0',
+    this.battery='-1',
     this.saleStatus=const <SaleStatus>{SaleStatus.selling},
     this.options = const {'기스':false, '흠집':false, '파손':false, '찍힘':false, '잔상':false, '미개봉':false, '애플케어플러스':false}
   });
 }
+
+//StateNotifier로 Mal data 상태 관리
+final malProvider = StateNotifierProvider<MalNotifier, List>(
+  (ref) {
+    final settings = ref.watch(settingsProvider);
+    return MalNotifier(settings);
+  }
+);
+class MalNotifier extends StateNotifier<List> {
+  final Settings settings;
+
+  MalNotifier(this.settings): super(['']);
+
+  Uri creatUrlFromsettings() {
+    String status='';
+    if (settings.saleStatus.contains(SaleStatus.selling)) status += '0';
+    if (settings.saleStatus.contains(SaleStatus.soldout)) status += '1';
+
+    String featList = '';
+    settings.options.forEach(
+      (key, value) {
+        if (value == true) {featList += '1';}
+        else {featList += '0';}
+      }
+    );
+    const baseUrl = 'http://127.0.0.1:8000/movingaverageline/';
+    final queryParams = {
+      'model': settings.model == 'Normal' ? settings.product : settings.product + settings.model,
+      'storage': settings.storage,
+      'search_date': settings.fromDate + settings.toDate,
+      'battery': settings.battery,
+      'status': status,
+      'feat_list': featList,
+    };
+
+    return Uri.parse(baseUrl).replace(queryParameters: queryParams);
+  }
+
+
+  Future<void> fetchMalData() async {
+      final url = creatUrlFromsettings();
+      final res =  await http.get(url);
+      state = jsonDecode(utf8.decode(res.bodyBytes));
+  }
+  void refresh() {
+    fetchMalData();
+  }
+}
+
 
 class ChartPage extends ConsumerStatefulWidget {
   const ChartPage ({super.key});
@@ -285,27 +339,29 @@ class ChartPage extends ConsumerStatefulWidget {
 class ChartPageState extends ConsumerState<ChartPage> {
   @override
   Widget build(BuildContext context) {
-    final selectedSettings = ref.watch(settingsProvider);
-
-    return Column(
-      children: [
-        const SettingBar(),
+    return const Column(
+      children: [ 
+        SettingBar(),
         Expanded(
-          child: Column(
-            children: [
-              Text(selectedSettings.product),
-              Text(selectedSettings.model),
-              Text(selectedSettings.storage),
-              Text(selectedSettings.fromDate),
-              Text(selectedSettings.toDate),
-              Text(selectedSettings.battery),
-              Text(selectedSettings.saleStatus.toString()),
-              Text(selectedSettings.options.toString()),
-            ],
-          ) 
+          child: SingleChildScrollView(
+            child: ChartView(),
+          )
         ),
-      ],
+      ]
     );
+  }
+}
+
+class ChartView extends ConsumerStatefulWidget {
+  const ChartView([Key? key]): super(key: key);
+
+  @override
+  ChartViewState createState() => ChartViewState();
+}
+class ChartViewState extends ConsumerState<ChartView> {
+  @override
+  Widget build(BuildContext context) {
+    return Text('Unimplemented');
   }
 }
 
@@ -388,11 +444,11 @@ class DropdownButtonTemplateState extends ConsumerState<DropdownButtonTemplate> 
   }
 }
 
-class SettingBar extends StatelessWidget {
+class SettingBar extends ConsumerWidget {
   const SettingBar ({super.key});
   
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Column(
       children: [
         Row(
@@ -415,7 +471,9 @@ class SettingBar extends StatelessWidget {
                     borderRadius: BorderRadius.circular(12)
                   )
                 ),
-                onPressed: () {}, 
+                onPressed: () {
+                  ref.read(malProvider.notifier).refresh();
+                },
                 child: const Text(
                   '검색',
                   style: TextStyle(
@@ -442,9 +500,9 @@ class SettingBar1 extends StatelessWidget {
     return const Row(
       mainAxisAlignment: MainAxisAlignment.spaceAround,
       children: [
-        DropdownButtonTemplate(list: ['iPhone14', 'iPhone15'], valueName: 'product',),
-        DropdownButtonTemplate(list: ['Normal', 'Plus'], valueName: 'model',),
-        DropdownButtonTemplate(list: ['128GB', '256GB'], valueName: 'storage',),
+        DropdownButtonTemplate(list: ['iPhone14', ''], valueName: 'product',),
+        DropdownButtonTemplate(list: ['Normal', 'Plus', 'Pro', 'ProMax'], valueName: 'model',),
+        DropdownButtonTemplate(list: ['128GB', '256GB', '512GB', '1024GB'], valueName: 'storage',),
         DatePicker(to: false),
         DatePicker(to: true),
       ]
@@ -574,7 +632,7 @@ class NumberInput extends ConsumerStatefulWidget {
 }
 class NumberInputState extends ConsumerState<NumberInput> {
   late TextEditingController _controller;
-  final min = 0;
+  final min = -1;
   final max = 100;
 
   @override
