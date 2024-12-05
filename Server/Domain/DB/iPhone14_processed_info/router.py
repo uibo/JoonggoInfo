@@ -23,7 +23,7 @@ router = APIRouter(
 )
 @router.get("/", status_code=status.HTTP_200_OK)
 def read_records_by_option(model: str|None = None, storage: str|None = None,
-                                  battery: int = -1, status: int|None = None,  
+                                  battery: int = -1, status: str = '',  
                                   feat_list: str = "0000000", search_date: str = '2022-01-012024-11-30', db: Session=Depends(get_db)):
     return query.select_records_by_option(model=model,
                                           storage=storage,

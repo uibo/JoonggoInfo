@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from models import iPhone14_processed_info
 
 def select_records_by_option(db: Session, model: str, storage: str,
-                                  battery: int, status: int,  
+                                  battery: int, status: str,  
                                   feat_list: str, search_date: str):
     query = db.query(iPhone14_processed_info)
     if model != None:
@@ -15,8 +15,8 @@ def select_records_by_option(db: Session, model: str, storage: str,
         query = query.filter(func.JSON_CONTAINS(iPhone14_processed_info.feature_list, f'"{storage}"'))
     if battery:
         query = query.filter(iPhone14_processed_info.battery >= battery)
-    if status != None:
-        query = query.filter(iPhone14_processed_info.status == status)
+    if len(status) == 1:
+        query = query.filter(iPhone14_processed_info.status == int(status))
     query = query.filter(iPhone14_processed_info.upload_date>=datetime.strptime(search_date[:10],'%Y-%m-%d'))
     query = query.filter(iPhone14_processed_info.upload_date<=datetime.strptime(search_date[10:], '%Y-%m-%d'))
     feat_dict = {"기스": int(feat_list[0]),
