@@ -1,17 +1,16 @@
 import 'dart:convert';
-
-import 'package:http/http.dart' as http;
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:syncfusion_flutter_charts/charts.dart';
 
 
 void main() {
   runApp(
-    ProviderScope(
+    const ProviderScope(
       child: MyApp()
     )
   );
@@ -31,14 +30,12 @@ class MyApp extends StatelessWidget {
     );
   }
 }
-
 class MainPage extends StatefulWidget {
   const MainPage ({super.key});
 
   @override
   MainPageState createState() => MainPageState();
 }
-
 class MainPageState extends State<MainPage> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
@@ -151,12 +148,10 @@ class MainPageState extends State<MainPage> {
   }
 }
 
-
 enum SaleStatus { selling, soldout }
 final settingsProvider = StateNotifierProvider<SettingsNotifier, Settings>((ref) => SettingsNotifier());
 class SettingsNotifier extends StateNotifier<Settings> {
-  SettingsNotifier() : super(Settings(
-    toDate: DateFormat("yyyy-MM-dd").format(DateTime.now())));
+  SettingsNotifier() : super(Settings());
 
   void updateproduct (String newValue) {
     state = Settings(
@@ -274,30 +269,26 @@ class Settings {
     this.model='Normal',
     this.storage='128GB',
     this.fromDate='2022-01-01',
-    this.toDate='2024-06-31',
-    this.battery='-1',
+    this.toDate= '2024-12-08',
+    this.battery='0',
     this.saleStatus=const <SaleStatus>{SaleStatus.selling},
     this.options = const {'기스':false, '흠집':false, '파손':false, '찍힘':false, '잔상':false, '미개봉':false, '애플케어플러스':false}
   });
 }
 
-//StateNotifier로 Mal data 상태 관리
-final malProvider = StateNotifierProvider<MalNotifier, List>(
-  (ref) {
-    final settings = ref.watch(settingsProvider);
-    return MalNotifier(settings);
-  }
-);
-class MalNotifier extends StateNotifier<List> {
-  final Settings settings;
+final malProvider = StateNotifierProvider<MalNotifier, ChartData>((ref) => MalNotifier(ref));
+class MalNotifier extends StateNotifier<ChartData> {
+  final Ref ref;
+  late Settings settings;
 
-  MalNotifier(this.settings): super(['']);
+  MalNotifier(this.ref): super(const ChartData()) {
+    settings = ref.read(settingsProvider);
+  }
 
   Uri creatUrlFromsettings() {
     String status='';
     if (settings.saleStatus.contains(SaleStatus.selling)) status += '0';
     if (settings.saleStatus.contains(SaleStatus.soldout)) status += '1';
-
     String featList = '';
     settings.options.forEach(
       (key, value) {
@@ -307,28 +298,39 @@ class MalNotifier extends StateNotifier<List> {
     );
     const baseUrl = 'http://127.0.0.1:8000/movingaverageline/';
     final queryParams = {
-      'model': settings.model == 'Normal' ? settings.product : settings.product + settings.model,
-      'storage': settings.storage,
       'search_date': settings.fromDate + settings.toDate,
       'battery': settings.battery,
       'status': status,
       'feat_list': featList,
     };
-
+    if (settings.model != 'All') {
+      if (settings.model == 'Normal') {queryParams['model'] = settings.product;}
+      else {queryParams['model'] = settings.product + settings.model;}
+    }
+    if (settings.storage != 'All') {queryParams['storage'] = settings.storage;}
     return Uri.parse(baseUrl).replace(queryParameters: queryParams);
   }
 
-
   Future<void> fetchMalData() async {
-      final url = creatUrlFromsettings();
-      final res =  await http.get(url);
-      state = jsonDecode(utf8.decode(res.bodyBytes));
+    final url = creatUrlFromsettings();
+    final res =  await http.get(url);
+    state = ChartData(
+      malMap: jsonDecode(utf8.decode(res.bodyBytes))[0], 
+      volumeMap: jsonDecode(utf8.decode(res.bodyBytes))[1],
+    );
   }
+
   void refresh() {
+    settings = ref.read(settingsProvider);
     fetchMalData();
   }
 }
+class ChartData {
+  const ChartData({this.malMap = const {'2022-01-01':100000}, this.volumeMap = const {'2022-01-01':1}});
 
+  final Map malMap;
+  final Map volumeMap;
+}
 
 class ChartPage extends ConsumerStatefulWidget {
   const ChartPage ({super.key});
@@ -337,14 +339,16 @@ class ChartPage extends ConsumerStatefulWidget {
   ChartPageState createState() => ChartPageState();
 }
 class ChartPageState extends ConsumerState<ChartPage> {
+  bool showChart = false;
+
   @override
   Widget build(BuildContext context) {
-    return const Column(
+    return Column(
       children: [ 
-        SettingBar(),
+        SettingBar(onPressed: () {setState(() {if (!showChart) showChart = true;});},),
         Expanded(
           child: SingleChildScrollView(
-            child: ChartView(),
+            child: showChart ? const ChartView() : const SizedBox(),
           )
         ),
       ]
@@ -352,6 +356,17 @@ class ChartPageState extends ConsumerState<ChartPage> {
   }
 }
 
+class SfChartData {
+  final DateTime date;
+  final int price;
+  final int volume;
+
+  const SfChartData ({
+    required this.date, 
+    required this.price, 
+    required this.volume,
+  });
+}
 class ChartView extends ConsumerStatefulWidget {
   const ChartView([Key? key]): super(key: key);
 
@@ -359,9 +374,71 @@ class ChartView extends ConsumerStatefulWidget {
   ChartViewState createState() => ChartViewState();
 }
 class ChartViewState extends ConsumerState<ChartView> {
+  List<SfChartData> convertlistSfChartData(ChartData chartData) {
+    List<SfChartData> listChartData = [];
+    var malEntries = chartData.malMap.entries;
+    var volumeEntries = chartData.volumeMap.entries;
+    for (int i = 0; i < malEntries.length; i++) {
+      listChartData.add(
+        SfChartData(
+          date: DateTime.parse(malEntries.elementAt(i).key) ,
+          price: malEntries.elementAt(i).value, 
+          volume: volumeEntries.elementAt(i).value,
+        )
+      );
+    }
+    return listChartData;
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Text('Unimplemented');
+    ChartData chartData = ref.watch(malProvider);
+    List<SfChartData> listSfChartData = convertlistSfChartData(chartData);
+
+    return Center(
+      child: SfCartesianChart(
+        legend: const Legend(
+          isVisible: true,
+          position: LegendPosition.bottom,
+        ),
+        primaryXAxis: DateTimeAxis(
+          intervalType: DateTimeIntervalType.months,
+          interval: 1,
+          labelRotation: -45,
+          dateFormat: DateFormat('yyyy-MM-dd'),
+        ),
+        primaryYAxis: NumericAxis(name: 'Price',),
+        axes: [NumericAxis(name: 'Volume', opposedPosition: true,)],
+        series: [
+          LineSeries<SfChartData, DateTime>(
+            dataSource: listSfChartData,
+            xValueMapper: (SfChartData data, _) {return data.date;},
+            yValueMapper: (SfChartData data, _) {return data.price;},
+            yAxisName: 'Price',
+            name: 'Price',
+          ),
+          ColumnSeries<SfChartData, DateTime>(
+            dataSource: listSfChartData,
+            xValueMapper: (SfChartData data, _) {return data.date;},
+            yValueMapper: (SfChartData data, _) {return data.volume;},
+            yAxisName: 'Volume',
+            name: 'Volume',
+          )
+        ],
+        tooltipBehavior: TooltipBehavior(
+          enable: true,
+          shared: true,
+          activationMode: ActivationMode.singleTap,
+        ),
+        trackballBehavior: TrackballBehavior(
+          enable: true,
+          tooltipSettings: const InteractiveTooltip(
+            enable: true,
+            format: 'point.x : point.y',
+          ),
+        ),
+      )
+    );
   }
 }
 
@@ -445,7 +522,8 @@ class DropdownButtonTemplateState extends ConsumerState<DropdownButtonTemplate> 
 }
 
 class SettingBar extends ConsumerWidget {
-  const SettingBar ({super.key});
+  final Function onPressed;
+  const SettingBar ({required this.onPressed, super.key});
   
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -472,6 +550,7 @@ class SettingBar extends ConsumerWidget {
                   )
                 ),
                 onPressed: () {
+                  onPressed();
                   ref.read(malProvider.notifier).refresh();
                 },
                 child: const Text(
@@ -500,9 +579,9 @@ class SettingBar1 extends StatelessWidget {
     return const Row(
       mainAxisAlignment: MainAxisAlignment.spaceAround,
       children: [
-        DropdownButtonTemplate(list: ['iPhone14', ''], valueName: 'product',),
-        DropdownButtonTemplate(list: ['Normal', 'Plus', 'Pro', 'ProMax'], valueName: 'model',),
-        DropdownButtonTemplate(list: ['128GB', '256GB', '512GB', '1024GB'], valueName: 'storage',),
+        DropdownButtonTemplate(list: ['iPhone14'], valueName: 'product',),
+        DropdownButtonTemplate(list: ['All', 'Normal', 'Plus', 'Pro', 'ProMax'], valueName: 'model',),
+        DropdownButtonTemplate(list: ['All', '128GB', '256GB', '512GB', '1024GB'], valueName: 'storage',),
         DatePicker(to: false),
         DatePicker(to: true),
       ]
@@ -632,7 +711,7 @@ class NumberInput extends ConsumerStatefulWidget {
 }
 class NumberInputState extends ConsumerState<NumberInput> {
   late TextEditingController _controller;
-  final min = -1;
+  final min = 0;
   final max = 100;
 
   @override
