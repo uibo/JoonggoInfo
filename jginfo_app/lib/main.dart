@@ -6,7 +6,9 @@ import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import 'enroll_page.dart' hide OptionButton, OptionButtonState;
 
 void main() {
   runApp(
@@ -240,7 +242,7 @@ class SettingsNotifier extends StateNotifier<Settings> {
   void updateoption(String key) {
     Map<String, bool> newoptions = Map<String, bool>.from(state.options);
 
-    newoptions[key] = !(newoptions[key] ?? false);
+    newoptions[key] = !(newoptions[key] ?? false) ;
     
     state = Settings(
       product: state.product, 
@@ -276,12 +278,12 @@ class Settings {
   });
 }
 
-final malProvider = StateNotifierProvider<MalNotifier, ChartData>((ref) => MalNotifier(ref));
-class MalNotifier extends StateNotifier<ChartData> {
+final malProvider = StateNotifierProvider<MalNotifier, AsyncValue<ChartData>>((ref) => MalNotifier(ref));
+class MalNotifier extends StateNotifier<AsyncValue<ChartData>> {
   final Ref ref;
   late Settings settings;
 
-  MalNotifier(this.ref): super(const ChartData()) {
+  MalNotifier(this.ref): super(const AsyncValue.loading()) {
     settings = ref.read(settingsProvider);
   }
 
@@ -289,11 +291,11 @@ class MalNotifier extends StateNotifier<ChartData> {
     String status='';
     if (settings.saleStatus.contains(SaleStatus.selling)) status += '0';
     if (settings.saleStatus.contains(SaleStatus.soldout)) status += '1';
-    String featList = '';
+    String featureList = '';
     settings.options.forEach(
       (key, value) {
-        if (value == true) {featList += '1';}
-        else {featList += '0';}
+        if (value == true) {featureList += '1';}
+        else {featureList += '0';}
       }
     );
     const baseUrl = 'http://127.0.0.1:8000/movingaverageline/';
@@ -301,7 +303,70 @@ class MalNotifier extends StateNotifier<ChartData> {
       'search_date': settings.fromDate + settings.toDate,
       'battery': settings.battery,
       'status': status,
-      'feat_list': featList,
+      'feature_list': featureList,
+    };
+    if (settings.model != 'All') {
+      if (settings.model == 'Normal') {queryParams['model'] = settings.product;}
+      else {queryParams['model'] = settings.product + settings.model;}
+    }
+    if (settings.storage != 'All') {queryParams['storage'] = settings.storage;}
+    return Uri.parse(baseUrl).replace(queryParameters: queryParams);
+  }
+
+  Future<void> fetchMalData() async {
+    state = const AsyncValue.loading();
+    try {
+    final url = creatUrlFromsettings();
+    final res =  await http.get(url);
+    state = AsyncValue.data(
+      ChartData(
+        malMap: jsonDecode(utf8.decode(res.bodyBytes))[0], 
+        volumeMap: jsonDecode(utf8.decode(res.bodyBytes))[1],
+      )
+    );
+    } catch (error, stackTrace) {
+      state = AsyncValue.error(error, stackTrace);
+    }
+  }
+
+  void refresh() {
+    settings = ref.read(settingsProvider);
+    fetchMalData();
+  }
+}
+class ChartData {
+  const ChartData({this.malMap, this.volumeMap});
+
+  final Map? malMap;
+  final Map? volumeMap;
+}
+
+final itemsProvider = StateNotifierProvider<ItemsNotifier, AsyncValue<List>>((ref) => ItemsNotifier(ref));
+class ItemsNotifier extends StateNotifier<AsyncValue<List>> {
+  final Ref ref;
+  late Settings settings;
+
+  ItemsNotifier(this.ref) : super(const AsyncValue.data([])) {
+    settings = ref.read(settingsProvider);
+  }
+
+  Uri creatUrlFromsettings() {
+    String status='';
+    if (settings.saleStatus.contains(SaleStatus.selling)) status += '0';
+    if (settings.saleStatus.contains(SaleStatus.soldout)) status += '1';
+    String featureList = '';
+    settings.options.forEach(
+      (key, value) {
+        if (value == true) {featureList += '1';}
+        else {featureList += '0';}
+      }
+    );
+    const baseUrl = 'http://127.0.0.1:8000/iPhone14_processed_info/';
+    final queryParams = {
+      'search_date': settings.fromDate + settings.toDate,
+      'battery': settings.battery,
+      'status': status,
+      'feature_list': featureList,
     };
     if (settings.model != 'All') {
       if (settings.model == 'Normal') {queryParams['model'] = settings.product;}
@@ -314,22 +379,18 @@ class MalNotifier extends StateNotifier<ChartData> {
   Future<void> fetchMalData() async {
     final url = creatUrlFromsettings();
     final res =  await http.get(url);
-    state = ChartData(
-      malMap: jsonDecode(utf8.decode(res.bodyBytes))[0], 
-      volumeMap: jsonDecode(utf8.decode(res.bodyBytes))[1],
+    state = AsyncData((jsonDecode(utf8.decode(res.bodyBytes)) as List).map(
+        (item) {return Map<String, dynamic>.from(item);}
+      )
+    .toList()
     );
   }
 
   void refresh() {
+    state = AsyncLoading();
     settings = ref.read(settingsProvider);
     fetchMalData();
   }
-}
-class ChartData {
-  const ChartData({this.malMap = const {'2022-01-01':100000}, this.volumeMap = const {'2022-01-01':1}});
-
-  final Map malMap;
-  final Map volumeMap;
 }
 
 class ChartPage extends ConsumerStatefulWidget {
@@ -345,7 +406,17 @@ class ChartPageState extends ConsumerState<ChartPage> {
   Widget build(BuildContext context) {
     return Column(
       children: [ 
-        SettingBar(onPressed: () {setState(() {if (!showChart) showChart = true;});},),
+        SettingBar(
+          onPressedToRefesh: () {ref.read(malProvider.notifier).refresh();}, 
+          onPressedToShorChart: 
+          () {
+            setState(
+              () {
+                if (!showChart) showChart = true;
+              }
+            );
+          },
+        ),
         Expanded(
           child: SingleChildScrollView(
             child: showChart ? const ChartView() : const SizedBox(),
@@ -376,8 +447,8 @@ class ChartView extends ConsumerStatefulWidget {
 class ChartViewState extends ConsumerState<ChartView> {
   List<SfChartData> convertlistSfChartData(ChartData chartData) {
     List<SfChartData> listChartData = [];
-    var malEntries = chartData.malMap.entries;
-    var volumeEntries = chartData.volumeMap.entries;
+    var malEntries = chartData.malMap!.entries;
+    var volumeEntries = chartData.volumeMap!.entries;
     for (int i = 0; i < malEntries.length; i++) {
       listChartData.add(
         SfChartData(
@@ -390,64 +461,197 @@ class ChartViewState extends ConsumerState<ChartView> {
     return listChartData;
   }
 
+  Widget buildChart(List<SfChartData> listSfChartData) {
+    return SfCartesianChart(
+      legend: const Legend(
+        isVisible: true,
+        position: LegendPosition.bottom,
+      ),
+      primaryXAxis: DateTimeAxis(
+        intervalType: DateTimeIntervalType.months,
+        interval: 1,
+        labelRotation: -45,
+        dateFormat: DateFormat('yyyy-MM-dd'),
+      ),
+      primaryYAxis: NumericAxis(name: 'Price',),
+      axes: [NumericAxis(name: 'Volume', opposedPosition: true,)],
+      series: [
+        LineSeries<SfChartData, DateTime>(
+          dataSource: listSfChartData,
+          xValueMapper: (SfChartData data, _) {return data.date;},
+          yValueMapper: (SfChartData data, _) {return data.price;},
+          yAxisName: 'Price',
+          name: 'Price',
+        ),
+        ColumnSeries<SfChartData, DateTime>(
+          dataSource: listSfChartData,
+          xValueMapper: (SfChartData data, _) {return data.date;},
+          yValueMapper: (SfChartData data, _) {return data.volume;},
+          yAxisName: 'Volume',
+          name: 'Volume',
+        )
+      ],
+      tooltipBehavior: TooltipBehavior(
+        enable: true,
+        shared: true,
+        activationMode: ActivationMode.singleTap,
+      ),
+      trackballBehavior: TrackballBehavior(
+        enable: true,
+        tooltipSettings: const InteractiveTooltip(
+          enable: true,
+          format: 'point.x : point.y',
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    ChartData chartData = ref.watch(malProvider);
-    List<SfChartData> listSfChartData = convertlistSfChartData(chartData);
+    final chartDataValue = ref.watch(malProvider);
 
-    return Center(
-      child: SfCartesianChart(
-        legend: const Legend(
-          isVisible: true,
-          position: LegendPosition.bottom,
+    return SizedBox(
+    height: 500,
+    child: chartDataValue.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (error, stacktrace) => const Text('failed loading data'),
+      data: (chartData) => buildChart(convertlistSfChartData(chartData)),
+    ),
+  );
+  }
+}
+
+class ListPage extends ConsumerStatefulWidget {
+  const ListPage({super.key});
+
+  @override
+  ListPageState createState() => ListPageState();
+}
+class ListPageState extends ConsumerState<ListPage> {
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [ 
+        SettingBar(onPressedToRefesh: () {ref.read(itemsProvider.notifier).refresh();},),
+        Expanded(
+          child: ListComponent(),
         ),
-        primaryXAxis: DateTimeAxis(
-          intervalType: DateTimeIntervalType.months,
-          interval: 1,
-          labelRotation: -45,
-          dateFormat: DateFormat('yyyy-MM-dd'),
-        ),
-        primaryYAxis: NumericAxis(name: 'Price',),
-        axes: [NumericAxis(name: 'Volume', opposedPosition: true,)],
-        series: [
-          LineSeries<SfChartData, DateTime>(
-            dataSource: listSfChartData,
-            xValueMapper: (SfChartData data, _) {return data.date;},
-            yValueMapper: (SfChartData data, _) {return data.price;},
-            yAxisName: 'Price',
-            name: 'Price',
-          ),
-          ColumnSeries<SfChartData, DateTime>(
-            dataSource: listSfChartData,
-            xValueMapper: (SfChartData data, _) {return data.date;},
-            yValueMapper: (SfChartData data, _) {return data.volume;},
-            yAxisName: 'Volume',
-            name: 'Volume',
-          )
-        ],
-        tooltipBehavior: TooltipBehavior(
-          enable: true,
-          shared: true,
-          activationMode: ActivationMode.singleTap,
-        ),
-        trackballBehavior: TrackballBehavior(
-          enable: true,
-          tooltipSettings: const InteractiveTooltip(
-            enable: true,
-            format: 'point.x : point.y',
-          ),
-        ),
-      )
+      ]
     );
   }
 }
 
-class ListPage extends StatelessWidget {
-  const ListPage({super.key});
+class ListComponent extends ConsumerStatefulWidget {
+  const ListComponent ({super.key});
+
+  @override
+  ListComponentState createState() => ListComponentState();
+}
+class ListComponentState extends ConsumerState<ListComponent> {
+  @override
+  Widget build(BuildContext context) {
+    final itemsData = ref.watch(itemsProvider);
+
+    return itemsData.when(
+      data: (itemsData) {
+        return GridView.builder(
+          itemCount: itemsData.length,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 4),
+          itemBuilder: (context, index) {
+            Map item = itemsData[index];
+            return Card(  
+              child: ItemCard(item: item),
+            );
+          },
+        );
+      },
+      error: (error, stacktrace) {return const Text('faile loading Data');}, 
+      loading: () => Center(child: const CircularProgressIndicator()),
+    );
+  }
+}
+
+final formatter = NumberFormat('#,###');
+class ItemCard extends StatelessWidget {
+  final Map item;
+
+  const ItemCard({required this.item, super.key});
 
   @override
   Widget build(BuildContext context) {
-    return const Center(child: Text('List Page Content'));
+    return Container(
+      width: 100,
+      height: 200,
+      padding: const EdgeInsets.all(24),
+      clipBehavior: Clip.antiAlias,
+      decoration: ShapeDecoration(
+          color: Colors.white,
+          shape: RoundedRectangleBorder(
+              side: BorderSide(width: 2, color: Color(0xFFB1B9C0)),
+              borderRadius: BorderRadius.circular(16),
+          ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Container(
+              alignment: Alignment.center,
+              child: Image.network(
+                item['imgUrl'],
+                  errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    width: double.infinity,
+                    color: Colors.grey[200],
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.error_outline, size: 40, color: Colors.grey[400]),
+                        SizedBox(height: 8),
+                        Text('이미지를 불러올 수 없습니다', 
+                          style: TextStyle(color: Colors.grey[600]))
+                      ],
+                    )
+                  );
+                }
+              )
+            ),
+          ),
+          Text('${item['upload_date']}'),
+          const SizedBox(height: 4),
+          Text('₩ ${formatter.format(item['price'])}'),
+          const SizedBox(height: 4),
+          Text(item['model']),
+          const SizedBox(height: 4),
+          Text('${item['feature_list']}'),
+          const SizedBox(height: 4),
+          Center(
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                minimumSize: Size(double.infinity, 40),
+                backgroundColor: Color(0xFF495057),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)
+                )
+              ),
+              onPressed: () {
+                Uri _url = Uri.parse(item['url']);
+                  launchUrl(_url);
+              },
+              child: const Text(
+                'Go to Product Page',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontFamily: 'Open Sans',
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -456,7 +660,7 @@ class EnrollPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(child: Text('Enroll Page Content'));
+    return const InputFormWidget();
   }
 }
 
@@ -521,9 +725,11 @@ class DropdownButtonTemplateState extends ConsumerState<DropdownButtonTemplate> 
   }
 }
 
+
 class SettingBar extends ConsumerWidget {
-  final Function onPressed;
-  const SettingBar ({required this.onPressed, super.key});
+  final Function? onPressedToShorChart;
+  final Function onPressedToRefesh;
+  const SettingBar ({required this.onPressedToRefesh, this.onPressedToShorChart, super.key});
   
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -550,8 +756,8 @@ class SettingBar extends ConsumerWidget {
                   )
                 ),
                 onPressed: () {
-                  onPressed();
-                  ref.read(malProvider.notifier).refresh();
+                  if (onPressedToShorChart != null) {onPressedToShorChart!();}
+                  onPressedToRefesh();
                 },
                 child: const Text(
                   '검색',
