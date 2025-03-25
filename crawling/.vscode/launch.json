@@ -12,7 +12,11 @@
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
-            "python": "/home/uibo/.cache/pypoetry/virtualenvs/crawling-IN-em8lP-py3.10/bin/python"
+            "python": "/home/uibo/.cache/pypoetry/virtualenvs/crawling-IN-em8lP-py3.10/bin/python",
+            "args": [
+                "uibo",
+                "1231",
+            ]
         }
     ]
 }
