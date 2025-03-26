@@ -1,8 +1,11 @@
 import sys
 import logging
 from datetime import datetime, timedelta
+import json
 
-import pandas as pd
+import requests
+from bs4 import BeautifulSoup
+
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session
 from webdriver_manager.chrome import ChromeDriverManager
@@ -42,32 +45,18 @@ class PostInfoExtractor:
 
             for post in unextracted_postinfo_records:
                 url = f"https://web.joongna.com/product/{post.post_identifier}"
-                self.driver.get(url)
+                response = requests.get(url)
+                soup = BeautifulSoup(response.text, "html.parser")
                 try:
-                    WebDriverWait(self.driver, 2).until(EC.presence_of_element_located((By.TAG_NAME, "article")))
-                    content = self.driver.find_element(By.TAG_NAME, 'article').text
-                    if "거래희망지역" in content:
-                        content, location = content.split("거래희망지역")
-                    else:
-                        location = None
-                    # 제목, 가격, 업로드 날짜 추출
-                    title_tag = self.driver.find_element(By.TAG_NAME, 'h1')
-                    complex = self.driver.execute_script("return arguments[0].parentNode;", title_tag)
-                    complex = self.driver.execute_script("return arguments[0].parentNode;", complex)
-                    complex = complex.text.split('\n')
-                    title = complex[0]
-                    price = int(complex[1].replace("원", "").replace(",", ""))
-                    uploaddate = complex[2].split('·')[0].strip()
-                    if '전' in uploaddate:
-                        if '일' in uploaddate:
-                            now = datetime.now()
-                            days_ago = int(uploaddate.split('일')[0])
-                            uploaddate = now - timedelta(days=days_ago)
-                        else:
-                            uploaddate = datetime.now()
-                    img_url = self.driver.find_element(By.CLASS_NAME, 'col-span-1').find_element(By.TAG_NAME, 'img').get_attribute("src")
-                    status = 1 if "판매완료" in self.driver.find_element(By.CLASS_NAME, 'col-span-1').text else 0
-                    extracted_postinfo.append(PostInfo(post_id = post.id, title = title, content = content, price = price, uploaddate= uploaddate, status = status, location = location, imgurl = img_url))
+                    title = soup.find('meta', {'property': "og:title"}).attrs['content']
+                    content = soup.find('meta', {'property': "og:description"}).attrs['content']
+                    price = json.loads(soup.find('script', {'type':"application/ld+json"}).contents[0])['offers'][0]['price']
+                    uploaddate = json.loads(soup.find('script', {'id':"__NEXT_DATA__"}).contents[0])["props"]["pageProps"]["dehydratedState"]["queries"][1]["state"]["data"]["data"]["sortDate"]
+                    status = 1 if soup.find('img', {'alt':"판매완료"}) else 0
+                    location_tag = soup.find('path', {'id':"Subtract"})
+                    location = str(location_tag.next) if location_tag else None
+                    imgurl = soup.find('meta', {'property':"og:image"}).attrs['content'] 
+                    extracted_postinfo.append(PostInfo(post_id = post.id, title = title, content = content, price = price, uploaddate= uploaddate, status = status, location = location, imgurl = imgurl))
                 except Exception as e:
                     logging.error(f"{post.id} - {str(e)}")  
 
