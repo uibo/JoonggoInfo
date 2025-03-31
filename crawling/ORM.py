@@ -9,6 +9,7 @@ class Post(Base):
     product = Column(String, nullable=True)
     site = Column(String, nullable=False)
     post_identifier = Column(Integer, nullable=False)
+    is_deleted = Column(Boolean, default=0)
     
 class PostInfo(Base):
     __tablename__ = "postinfo"
