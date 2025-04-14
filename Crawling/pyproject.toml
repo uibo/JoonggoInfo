@@ -18,6 +18,7 @@ selenium = "^4.29.0"
 webdriver-manager = "^4.0.2"
 pandas = "^2.2.3"
 sqlalchemy = "^2.0.38"
+python-dotenv = "^1.1.0"
 
 [build-system]
 requires = ["poetry-core"]
