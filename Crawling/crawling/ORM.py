@@ -21,22 +21,10 @@ class PostInfo(Base):
     status  = Column(Boolean, nullable=True)
     location = Column(String, nullable=True)
     imgurl = Column(String, nullable=True)
-
-class BunjangPostInfoTest(Base):
-    __tablename__ = "bunjang_postinfo_test"
-    post_id = Column(Integer, primary_key=True)
-    title = Column(String, nullable=True)
-    content = Column(String, nullable=True)
-    price = Column(Integer, nullable=False)
-    uploaddate = Column(Date, nullable=True)
-    status  = Column(Boolean, nullable=False)
-    location = Column(String, nullable=True)
-    imgurl = Column(String, nullable=True)
     conditions = Column(JSON, nullable=True)
 
-class UnextractedPostInfo(Base):
-    __tablename__ = "unextracted_postinfo"
+class Post_To_Extract_Info(Base):
+    __tablename__ = "post_to_extract_info"
     id = Column(Integer, primary_key=True, autoincrement=True)
     site = Column(String, nullable=False)
     post_identifier = Column(Integer, nullable=False)
-
