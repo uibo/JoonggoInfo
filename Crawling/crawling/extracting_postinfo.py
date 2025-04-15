@@ -1,4 +1,5 @@
 import sys
+
 import traceback
 import json
 import re
@@ -14,7 +15,6 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 
 from ORM import Post, PostInfo, Post_To_Extract_Info
-
 
 class PostInfoExtractor:
     def __init__(self, engine, batch_size=100):
@@ -193,4 +193,3 @@ if __name__ == "__main__":
         elif platform == 2:
             bunjang_post_extractor = BunjangPostInfoExtractor(engine)
             bunjang_post_extractor.extract_postinfo()
-

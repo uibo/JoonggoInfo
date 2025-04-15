@@ -134,4 +134,3 @@ if __name__ == "__main__" :
             bunjang_post_extractor.extract_post()
         elif platform == 3:
             break
-    
