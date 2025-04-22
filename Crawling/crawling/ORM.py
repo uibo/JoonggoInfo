@@ -6,10 +6,10 @@ Base = declarative_base()
 class Post(Base):
     __tablename__ = "post"
     id = Column(Integer, primary_key=True, autoincrement=True)
-    product = Column(String, nullable=True)
+    product = Column(String, nullable=False)
     site = Column(String, nullable=False)
     post_identifier = Column(Integer, nullable=False)
-    is_deleted = Column(Boolean, default=0)
+    is_deleted = Column(Boolean, nullable=False ,default=0)
     
 class PostInfo(Base):
     __tablename__ = "postinfo"
