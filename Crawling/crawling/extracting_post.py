@@ -277,12 +277,12 @@ if __name__ == "__main__" :
     DB_PASSWORD = os.getenv("DB_PASSWORD")
     engine = create_engine(f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@database-1.c12282e28jz4.ap-northeast-2.rds.amazonaws.com/joonggoinfo")
 
-    bunjangpostExtractor = BunjangPostExtractor(engine, 'iPhone14')
-    bunjangpostExtractor.process_all_pages()
+    # bunjangpostExtractor = BunjangPostExtractor(engine, 'iPhone14')
+    # bunjangpostExtractor.process_all_pages()
    
-    joongnacafapostextractor = JoongnacafePostExtractor(engine, 'iPhone14', '%BE%C6%C0%CC%C6%F914')
-    joongnacafapostextractor.process_all_pages()
+    # joongnacafapostextractor = JoongnacafePostExtractor(engine, 'iPhone14', '%BE%C6%C0%CC%C6%F914')
+    # joongnacafapostextractor.process_all_pages()
 
-    joongnawebpostextractor = JoongnawebPostExtractor(engine, 'iPhone14')
-    joongnawebpostextractor.process_all_pages()
+    # joongnawebpostextractor = JoongnawebPostExtractor(engine, 'iPhone14')
+    # joongnawebpostextractor.process_all_pages()
 
